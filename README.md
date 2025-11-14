@@ -17,3 +17,5 @@ spawn sphere id=brush x=350 y=250 radius=10 color=blue
 
 brush orbit main radius=80 speed=0.08
 brush trace-path steps=200
+
+Цей код створює два атоми та змушує один обертатися навколо іншого і залишати слід.
