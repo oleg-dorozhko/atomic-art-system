@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Atomic Art System (AAS) – Prototype</title>
+<style>
+    body { font-family: sans-serif; margin: 0; display: flex; height: 100vh; }
+    #left { width: 35%; padding: 10px; background:#f4f4f4; overflow:auto; }
+    #right { flex: 1; background:white; display:flex; flex-direction:column; }
+    textarea { width: 100%; height: 200px; font-family: monospace; font-size:14px; }
+    svg { width: 100%; height: 100%; border-top:1px solid #ccc; }
+    h2 { margin-top:0; }
+</style>
+</head>
+<body>
+
+<div id="left">
+    <h2>Atomic Art System</h2>
+    <p>Пиши команди тут і натискай <b>Run</b>.</p>
+
+<textarea id="code">
+# Example
+spawn sphere id=main x=250 y=250 radius=40 color=red
+spawn sphere id=brush x=350 y=250 radius=10 color=blue
+
+brush orbit main radius=80 speed=0.08
+brush trace-path steps=200
+</textarea>
+
+<button onclick="runAAS()">Run</button>
+
+<h3>Команди:</h3>
+<pre>
+spawn sphere id=NAME x=.. y=.. radius=.. color=..
+A attract B strength=..
+A repel B strength=..
+A orbit B radius=.. speed=..
+A trace-path steps=..
+</pre>
+
+</div>
+
+<div id="right">
+    <div style="padding:5px;background:#fafafa">Output SVG:</div>
+    <svg id="svg"></svg>
+</div>
+
+<script>
+/* ==========================================================
+   ATOMIC ART SYSTEM — MINIMAL ENGINE
+   ========================================================== */
+
+class Atom {
+    constructor(id, x, y, radius, color) {
+        this.id = id;
+        this.x = x;
+        this.y = y;
+        this.radius = radius;
+        this.color = color;
+    }
+}
+
+let atoms = {};
+let paths = [];
+
+/* ---------- Utility ---------- */
+function getAtom(name) {
+    if (!atoms[name]) throw "Atom not found: " + name;
+    return atoms[name];
+}
+
+/* ---------- Parsing ---------- */
+function parse(line) {
+    line = line.trim();
+    if (!line || line.startsWith("#")) return;
+
+    // spawn command
+    if (line.startsWith("spawn")) {
+        let p = Object.fromEntries(
+            [...line.matchAll(/(\w+)=([\w\.\#]+)/g)]
+            .map(m => [m[1], m[2]])
+        );
+        let a = new Atom(
+            p["id"],
+            parseFloat(p["x"]||200),
+            parseFloat(p["y"]||200),
+            parseFloat(p["radius"]||20),
+            p["color"]||"black"
+        );
+        atoms[a.id] = a;
+        return;
+    }
+
+    // orbit
+    if (line.includes("orbit")) {
+        let [aName,, bName] = line.split(" ");
+        let a = getAtom(aName);
+        let b = getAtom(bName);
+        let radius = parseFloat(line.match(/radius=([\d\.]+)/)?.[1] || 50);
+        let speed = parseFloat(line.match(/speed=([\d\.]+)/)?.[1] || 0.05);
+
+        // simulate orbit
+        for (let i=0; i<200; i++) {
+            let angle = i * speed;
+            let x = b.x + Math.cos(angle)*radius;
+            let y = b.y + Math.sin(angle)*radius;
+            a.x = x; a.y = y;
+        }
+        return;
+    }
+
+    // trace-path
+    if (line.includes("trace-path")) {
+        let [name] = line.split(" ");
+        let a = getAtom(name);
+        let steps = parseFloat(line.match(/steps=([\d]+)/)?.[1] || 100);
+
+        let d = `M ${a.x} ${a.y}`;
+        for (let i=0; i<steps; i++) {
+            d += ` L ${a.x} ${a.y}`;
+        }
+        paths.push({ d, color: a.color });
+        return;
+    }
+}
+
+/* ---------- Rendering ---------- */
+function renderSVG() {
+    let svg = document.getElementById("svg");
+    svg.innerHTML = "";
+
+    // paths
+    for (let p of paths) {
+        let el = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        el.setAttribute("d", p.d);
+        el.setAttribute("stroke", p.color);
+        el.setAttribute("fill", "none");
+        svg.appendChild(el);
+    }
+
+    // atoms
+    for (let a of Object.values(atoms)) {
+        let c = document.createElementNS("http://www.w3.org/2000/svg","circle");
+        c.setAttribute("cx", a.x);
+        c.setAttribute("cy", a.y);
+        c.setAttribute("r", a.radius);
+        c.setAttribute("fill", a.color);
+        svg.appendChild(c);
+    }
+}
+
+/* ---------- Execute ---------- */
+function runAAS() {
+    atoms = {};
+    paths = [];
+    document.getElementById("svg").innerHTML = "";
+
+    let code = document.getElementById("code").value.split("\n");
+    for (let line of code) parse(line);
+
+    renderSVG();
+}
+</script>
+
+</body>
+</html>
